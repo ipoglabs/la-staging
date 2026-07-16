@@ -16,6 +16,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import connectDB from "@/config/database";
+import User from "@/models/user";
+import { getSession } from "@/lib/auth";
 
 // Handle must be 3–20 lowercase letters, numbers, or underscores.
 const HANDLE_REGEX = /^[a-z0-9_]{3,20}$/;
@@ -24,34 +27,10 @@ const HANDLE_REGEX = /^[a-z0-9_]{3,20}$/;
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
 
-/**
- * Hard-coded reserved/taken handles for POC.
- * In production, query the User collection instead.
- */
-const TAKEN_HANDLES = new Set([
-  // Reserved system names
-  "admin",
-  "lokalads",
-  "support",
-  "help",
-  "info",
-  "moderator",
-  "api",
-  "www",
-  "mail",
-  "root",
-  "system",
-  "status",
-  "bot",
-  "team",
-  // Demo/test accounts
-  "anto27",
-  "gopi",
-  "john",
-  "jane",
-  "test",
-  "user",
-  "demo",
+// Reserved system names — always blocked even if not yet taken by a User doc.
+const RESERVED_HANDLES = new Set([
+  "admin", "lokalads", "support", "help", "info", "moderator",
+  "api", "www", "mail", "root", "system", "status", "bot", "team",
 ]);
 
 export async function POST(req: NextRequest) {
@@ -85,7 +64,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const available = !TAKEN_HANDLES.has(raw);
+  if (RESERVED_HANDLES.has(raw)) {
+    return NextResponse.json({ available: false, handle: raw });
+  }
+
+  await connectDB();
+
+  // Let the signed-in user "re-check" their own current handle as available.
+  const session = await getSession().catch(() => null);
+  const existing = await User.findOne({ userId: raw }).select("_id").lean();
+  const isOwnHandle =
+    !!existing &&
+    !!session?.userId &&
+    String((existing as { _id: unknown })._id) === String(session.userId);
+
+  const available = !existing || isOwnHandle;
 
   return NextResponse.json({ available, handle: raw });
 }

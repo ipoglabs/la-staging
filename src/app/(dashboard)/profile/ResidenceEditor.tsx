@@ -109,8 +109,6 @@ export function ResidenceEditor({
                 searchProvider="google"
                 countryScope={["SG", "UK", "IN"]}
                 trigger="link"
-                linkLabel="Pick a different location"
-                linkIcon={<MapPin className="size-4" />}
                 triggerClassName={cn(
                   laButtonVariants({ intent: "primary-blue", size: "default" }),
                   "w-full justify-center no-underline hover:no-underline"
@@ -131,8 +129,6 @@ export function ResidenceEditor({
               countryScope={["SG", "UK", "IN"]}
               trigger="link"
               placeholder="Search for your city..."
-              linkLabel="Pick your residence location"
-              linkIcon={<MapPin className="size-4" />}
               triggerClassName={cn(
                 laButtonVariants({ intent: "primary-blue", size: "default" }),
                 "w-full justify-center no-underline hover:no-underline"

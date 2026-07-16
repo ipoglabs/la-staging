@@ -39,6 +39,9 @@ import { Avatar } from "@/components/avatar/Avatar";
 import { LaBadge, LaButton, LaCard, LaSwitch } from "@/components/la";
 import { AddPhoneEditor } from "./AddPhoneEditor";
 import { ChangeEmailEditor } from "./ChangeEmailEditor";
+import { updateProfile } from "@/app/actions/updateProfile";
+import { updateContact } from "@/app/actions/profile/updateContact";
+import { updateLocation } from "@/app/actions/profile/updateLocation";
 import { cn } from "@/lib/utils";
 import { isStageFeatureEnabled } from "@/config";
 import {
@@ -64,6 +67,7 @@ import type {
   BasicInfoValues,
   ConnectedAccount,
   ContactValues,
+  ProfileUser,
   ResidenceValues,
   SavedLocation,
 } from "./types";
@@ -81,6 +85,35 @@ import {
 } from "./NotificationsEditor";
 import { TwoFactorAuthEditor } from "./TwoFactorAuthEditor";
 
+/**
+ * The User model stores phones as 3 flat fields (primaryNumber,
+ * secondaryNumber1, secondaryNumber2) — the UI works with a phones[] array.
+ * These two helpers convert between the two shapes. `visibleToBuyers` has no
+ * DB column yet, so it's UI-only state (resets to false on reload).
+ */
+function buildPhonesFromUser(user: ProfileUser): PhoneEntryList {
+  const entries: { id: string; number: string; primary: boolean }[] = [];
+  if (user.primaryNumber) entries.push({ id: "primary", number: user.primaryNumber, primary: true });
+  if (user.secondaryNumber1) entries.push({ id: "secondary1", number: user.secondaryNumber1, primary: false });
+  if (user.secondaryNumber2) entries.push({ id: "secondary2", number: user.secondaryNumber2, primary: false });
+  return entries.map((e) => ({ ...e, visibleToBuyers: false }));
+}
+type PhoneEntryList = { id: string; number: string; primary: boolean; visibleToBuyers: boolean }[];
+
+/** Maps a phones[] id ("primary" | "secondary1" | "secondary2") to the User schema field it persists to. */
+function phoneIdToField(id: string): "primaryNumber" | "secondaryNumber1" | "secondaryNumber2" {
+  if (id === "primary") return "primaryNumber";
+  if (id === "secondary1") return "secondaryNumber1";
+  return "secondaryNumber2";
+}
+
+/** Picks the next free schema slot for a newly-added phone number. */
+function nextFreePhoneId(existing: PhoneEntryList): string {
+  if (!existing.some((p) => p.id === "primary")) return "primary";
+  if (!existing.some((p) => p.id === "secondary1")) return "secondary1";
+  return "secondary2";
+}
+
 function buildDisplayedRoleBadges(
   roleIds: RoleId[],
   specialties: Partial<Record<RoleId, string>>,
@@ -96,7 +129,13 @@ function buildDisplayedRoleBadges(
 
 export type ProfilePageMode = "profile" | "account-settings";
 
-export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode }) {
+export function ProfilePageScreen({
+  mode = "profile",
+  user,
+}: {
+  mode?: ProfilePageMode;
+  user: ProfileUser;
+}) {
   const router = useRouter();
   const {
     checkEligibility,
@@ -125,78 +164,54 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
     newMessages: true,
     listingUpdates: true,
     savedSearchAlerts: true,
-    marketingEmails: false,
+    marketingEmails: user.marketingOptIn,
   });
   const notificationsOnCount = NOTIFICATION_PREF_KEYS.filter((key) => notifications[key]).length;
   const showTwoFactor = isStageFeatureEnabled("twoFactorAuth");
   const [twoFactorEditorOpen, setTwoFactorEditorOpen] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
-  // Profile data (mock — swap with session/API data when auth ships)
-  const [handle, setHandle] = useState("anto27");
+  // Profile data — seeded from the real, DB-backed user record (getCurrentUser()).
+  const [handle, setHandle] = useState(user.profileId || user.username || "");
   const [basicInfo, setBasicInfo] = useState<BasicInfoValues>({
-    fullName: "Gopinath Krishnamoorthi",
-    dateOfBirthIso: "1990-05-14",
-    gender: "Male",
+    fullName: user.fullName,
+    dateOfBirthIso: user.dateOfBirth,
+    gender: (["Male", "Female", "Prefer not to say"] as const).includes(user.gender as any)
+      ? (user.gender as BasicInfoValues["gender"])
+      : "Prefer not to say",
   });
-  // Roles example mirrors a real multi-hat user: owns a flat they rent out,
-  // runs a small side business, and works part-time as a property agent
-  // (specialized as "Real Estate Agent"). Every account is ALWAYS an
-  // Individual (BASE_ROLE, implicit — not stored here, never a choice).
-  // `intent` is a private-only preference (never shown publicly) capturing
-  // why they're here today — separate from identity. roleIds only holds the
-  // *additional* hats; specialties holds one optional refinement per
-  // specializable role; customRole holds the one optional free-text
-  // "own words" entry.
+  // Roles/intent/specialties are a private preference layer with no matching
+  // field on the User schema yet (schema only has a single flat `role`
+  // string). Left as local-only UI state — wiring this needs a schema
+  // decision (e.g. roles: string[] + intent: string) before it can persist.
   const [intent, setIntent] = useState<IntentId>(DEFAULT_INTENT);
-  const [roleIds, setRoleIds] = useState<RoleId[]>([
-    "business_owner",
-    "property_owner",
-    "agent_broker",
-  ]);
-  const [specialties, setSpecialties] = useState<Partial<Record<RoleId, string>>>({
-    agent_broker: "Real Estate Agent",
-  });
-  const [customRole, setCustomRole] = useState<string | null>(null);
+  const [roleIds, setRoleIds] = useState<RoleId[]>([]);
+  const [specialties, setSpecialties] = useState<Partial<Record<RoleId, string>>>({});
+  const [customRole, setCustomRole] = useState<string | null>(
+    user.role && !["individual", "business", "agency"].includes(user.role) ? user.role : null
+  );
   const [contact, setContact] = useState<ContactValues>({
-    email: "gopi@lokalads.com",
+    email: user.email,
     emailVerified: true,
-    phones: [
-      { id: "p1", number: "+65 9123 4567", primary: true, visibleToBuyers: false },
-      { id: "p2", number: "+65 8345 6789", primary: false, visibleToBuyers: false },
-    ],
+    phones: buildPhonesFromUser(user),
   });
   const [residence, setResidence] = useState<ResidenceValues>({
-    country: "India",
-    state: "Tamil Nadu",
-    city: "Tiruchirappalli",
+    country: user.address?.country || user.nationality || "",
+    state: user.address?.state || "",
+    city: user.address?.city || user.locality || "",
   });
 
   const [locations, setLocations] = useState<SavedLocation[]>(INITIAL_LOCATIONS);
   const primaryLocation = locations.find((l) => l.primary) ?? null;
+  // Connected accounts (Google/Apple/magic-link) aren't tracked on the User
+  // model yet — this stays local-only UI state until that's added.
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([
-    {
-      provider: "google",
-      status: "connected",
-      maskedIdentifier: "g*****n@gmail.com",
-      linkedAtIso: "2026-07-12",
-      lastUsedLabel: "Last used 2 days ago",
-      isPrimary: false,
-    },
-    {
-      provider: "apple",
-      status: "connected",
-      maskedIdentifier: "Private relay (hides email)",
-      linkedAtIso: "2026-01-03",
-      lastUsedLabel: "Last used today",
-      isPrimary: false,
-    },
     {
       provider: "magic_link",
       status: "connected",
-      maskedIdentifier: "gopi@lokalads.com",
-      linkedAtIso: "2026-07-10",
-      lastUsedLabel: "Last used today",
+      maskedIdentifier: user.email,
+      linkedAtIso: null,
+      lastUsedLabel: "Current sign-in method",
       isPrimary: true,
     },
   ]);
@@ -286,53 +301,77 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
     setPhoneEditorOpen(true);
   };
 
-  const handleEmailVerified = (newEmail: string) => {
-    setContact((prev) => ({ ...prev, email: newEmail, emailVerified: true }));
-    setChangeEmailEditorOpen(false);
-    toast.success("Email updated");
+  const handleEmailVerified = async (newEmail: string) => {
+    try {
+      await updateContact({ field: "email", value: newEmail });
+      setContact((prev) => ({ ...prev, email: newEmail, emailVerified: true }));
+      setChangeEmailEditorOpen(false);
+      toast.success("Email updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update email");
+    }
   };
 
-  const handlePhoneVerified = (fullNumber: string) => {
-    const newId = `phone-${Date.now()}`;
-    setContact((prev) => ({
-      ...prev,
-      phones: [
-        ...prev.phones,
-        { id: newId, number: fullNumber, primary: prev.phones.length === 0, visibleToBuyers: false },
-      ],
-    }));
-    setAddPhoneEditorOpen(false);
-    toast.success("Phone number added");
+  const handlePhoneVerified = async (fullNumber: string) => {
+    const newId = nextFreePhoneId(contact.phones);
+    try {
+      await updateContact({ field: phoneIdToField(newId), value: fullNumber });
+      setContact((prev) => ({
+        ...prev,
+        phones: [
+          ...prev.phones,
+          { id: newId, number: fullNumber, primary: prev.phones.length === 0, visibleToBuyers: false },
+        ],
+      }));
+      setAddPhoneEditorOpen(false);
+      toast.success("Phone number added");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't add phone number");
+    }
   };
 
-  const handlePhoneEditVerified = (fullNumber: string) => {
-    setContact((prev) => ({
-      ...prev,
-      phones: prev.phones.map((p) => p.id === phoneEditorId ? { ...p, number: fullNumber } : p),
-    }));
-    setPhoneEditorOpen(false);
-    toast.success("Phone number updated");
+  const handlePhoneEditVerified = async (fullNumber: string) => {
+    if (!phoneEditorId) return;
+    try {
+      await updateContact({ field: phoneIdToField(phoneEditorId), value: fullNumber });
+      setContact((prev) => ({
+        ...prev,
+        phones: prev.phones.map((p) => p.id === phoneEditorId ? { ...p, number: fullNumber } : p),
+      }));
+      setPhoneEditorOpen(false);
+      toast.success("Phone number updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update phone number");
+    }
   };
 
-  const removePhone = (id: string) => {
-    // TODO [INTEGRATION]: DELETE /api/profile/phone/{id}
+  const removePhone = async (id: string) => {
     // Defense-in-depth: the trash-icon button only renders when there's more
     // than one number, but this guard stays here too (not just at render) —
     // per the standing rule, an account must never end up with zero phones.
-    setContact((prev) => {
-      if (prev.phones.length <= 1) return prev;
-      const filtered = prev.phones.filter((p) => p.id !== id);
-      const hasPrimary = filtered.some((p) => p.primary);
-      return {
-        ...prev,
-        phones: hasPrimary ? filtered : filtered.map((p, i) => ({ ...p, primary: i === 0 })),
-      };
-    });
-    setPhonePendingDelete(null);
+    if (contact.phones.length <= 1) return;
+    try {
+      await updateContact({ field: phoneIdToField(id), value: "" });
+      setContact((prev) => {
+        const filtered = prev.phones.filter((p) => p.id !== id);
+        const hasPrimary = filtered.some((p) => p.primary);
+        return {
+          ...prev,
+          phones: hasPrimary ? filtered : filtered.map((p, i) => ({ ...p, primary: i === 0 })),
+        };
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't remove phone number");
+    } finally {
+      setPhonePendingDelete(null);
+    }
   };
 
   const setPrimaryPhone = (id: string) => {
-    // TODO [INTEGRATION]: PATCH /api/profile/phone/{id} { primary: true }
+    // "Primary" here just controls display order/badge — both numbers are
+    // already persisted as primaryNumber/secondaryNumberN. Swapping which
+    // slot is "primary" would mean swapping the two DB field values; skipped
+    // for now since it's a cosmetic reorder, not a data change.
     setContact((prev) => ({
       ...prev,
       phones: prev.phones.map((p) => ({ ...p, primary: p.id === id })),
@@ -340,7 +379,7 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
   };
 
   const setPhoneVisibility = (id: string, visible: boolean) => {
-    // TODO [INTEGRATION]: PATCH /api/profile/phone/{id} { visibleToBuyers: visible }
+    // No visibleToBuyers column on the User model yet — UI-only for now.
     setContact((prev) => ({
       ...prev,
       phones: prev.phones.map((p) => (p.id === id ? { ...p, visibleToBuyers: visible } : p)),
@@ -350,7 +389,6 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
   const handleDeleteClick = async () => {
     resetDelete();
     const eligible = await checkEligibility();
-    // TODO: update to real delete-account route when auth ships
     if (eligible) router.push("/delete-account/confirm");
   };
 
@@ -864,7 +902,15 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
           open={handleEditorOpen}
           onOpenChange={setHandleEditorOpen}
           currentHandle={handle}
-          onSave={setHandle}
+          onSave={async (newHandle) => {
+            try {
+              await updateProfile({ userId: newHandle });
+              setHandle(newHandle);
+              toast.success("Handle updated");
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Couldn't update handle");
+            }
+          }}
         />
       )}
       {basicInfoEditorOpen && (
@@ -872,7 +918,19 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
           open={basicInfoEditorOpen}
           onOpenChange={setBasicInfoEditorOpen}
           value={basicInfo}
-          onSave={setBasicInfo}
+          onSave={async (next) => {
+            try {
+              await updateProfile({
+                fullName: next.fullName,
+                dateOfBirth: next.dateOfBirthIso,
+                gender: next.gender,
+              });
+              setBasicInfo(next);
+              toast.success("Basic info updated");
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Couldn't update basic info");
+            }
+          }}
         />
       )}
       {rolesEditorOpen && (
@@ -921,7 +979,19 @@ export function ProfilePageScreen({ mode = "profile" }: { mode?: ProfilePageMode
           open={residenceEditorOpen}
           onOpenChange={setResidenceEditorOpen}
           value={residence}
-          onSave={setResidence}
+          onSave={async (next) => {
+            try {
+              await updateLocation({
+                country: next.country,
+                state: next.state,
+                locality: next.city,
+              });
+              setResidence(next);
+              toast.success("Residence updated");
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Couldn't update residence");
+            }
+          }}
           primaryLocation={primaryLocation}
         />
       )}

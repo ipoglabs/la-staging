@@ -1,12 +1,11 @@
 import { sendEmail } from "@/lib/email";
 
-interface SendProfileUpdateEmailArgs {
+interface SendPasswordUpdateEmailArgs {
   fullName: string;
   email: string;
-  changes?: { field: string; oldValue: string; newValue: string }[];
 }
 
-export async function sendProfileUpdateEmail({ fullName, email }: SendProfileUpdateEmailArgs) {
+export async function sendPasswordUpdateEmail({ fullName, email }: SendPasswordUpdateEmailArgs) {
   const firstName = fullName.trim().split(/\s+/)[0] || fullName;
 
   const result = await sendEmail({
@@ -16,7 +15,7 @@ export async function sendProfileUpdateEmail({ fullName, email }: SendProfileUpd
   });
 
   if (!result.success) {
-    console.error("[sendProfileUpdateEmail] failed:", result.error);
+    console.error("[sendPasswordUpdateEmail] failed:", result.error);
   }
 
   return result;

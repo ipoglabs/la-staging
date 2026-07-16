@@ -19,27 +19,23 @@
  * Cancel at any stage discards everything; nothing is saved on the account
  * until Stage 4's Confirm Change succeeds. Design locked 2026-07-14.
  *
- * TODO [INTEGRATION]: replace the setTimeout mocks with real endpoints:
- *   POST  /api/profile/email/check-availability { email }
- *   POST  /api/profile/email/send-otp            { email }
- *   POST  /api/profile/email/verify-otp          { email, otp }
- *   POST  /api/profile/phone/send-otp             (resend — reuse existing)
- *   POST  /api/profile/phone/verify-otp           { phone, otp } (reuse existing)
- *   PATCH /api/profile/email                      { email } — commits the
- *     change and fires a fire-and-forget security notice to the OLD email.
+ * Availability check: POST /api/check-email (real, DB-backed).
+ * Email OTP send/verify: sendOtp/verifyOtp server actions (real, DB-backed,
+ * same Otp collection used at registration).
+ * Phone 2nd-factor OTP: sendOtp/verifyOtp with channel "phone" — DB-backed,
+ * but no SMS provider is wired up yet (see otpService.ts), so the code is
+ * shown in-app via toast instead of a real text message until one is added.
+ * Commit: updateContact({ field: "email", value }) server action.
  */
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LaInput } from "@/components/la";
 import { OtpVerify } from "@/components/otp-verify";
-import { VALID_OTP } from "@/lib/constants";
 import { isValidEmail } from "@/lib/validation";
+import { sendOtp } from "@/app/actions/profile/sendOtp";
+import { verifyOtp } from "@/app/actions/profile/verifyOtp";
 import { ResponsiveEditor } from "./ResponsiveEditor";
-
-// Demo-only: pretend this address is already taken, so the availability
-// check has something to reject. Real check happens server-side.
-const DEMO_TAKEN_EMAIL = "taken@example.com";
 
 type Stage = "enter-email" | "verify-new-email" | "verify-phone" | "confirm";
 
@@ -71,6 +67,7 @@ export function ChangeEmailEditor({
   const [otpError, setOtpError] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
 
   // Fresh state every time the dialog opens
   useEffect(() => {
@@ -82,10 +79,11 @@ export function ChangeEmailEditor({
       setOtpError(false);
       setVerifying(false);
       setSaving(false);
+      setDevCode(null);
     }
   }, [open]);
 
-  function handleSendCode() {
+  async function handleSendCode() {
     const trimmed = newEmail.trim();
     if (!trimmed) {
       setEmailError("Please enter your new email address.");
@@ -101,55 +99,78 @@ export function ChangeEmailEditor({
     }
     setEmailError("");
     setCheckingAvailability(true);
-    // TODO [INTEGRATION]: POST /api/profile/email/check-availability
-    setTimeout(() => {
-      setCheckingAvailability(false);
-      if (trimmed.toLowerCase() === DEMO_TAKEN_EMAIL) {
+    try {
+      const res = await fetch("/api/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Couldn't check email availability");
+      if (data.exists) {
         setEmailError("This email is already registered to another account.");
         return;
       }
-      // TODO [INTEGRATION]: POST /api/profile/email/send-otp
+      await sendOtp({ channel: "email", value: trimmed });
       setStage("verify-new-email");
-    }, 600);
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setCheckingAvailability(false);
+    }
   }
 
-  function handleNewEmailOtpComplete(otp: string) {
+  async function handleNewEmailOtpComplete(otp: string) {
     setVerifying(true);
-    // TODO [INTEGRATION]: POST /api/profile/email/verify-otp
-    setTimeout(() => {
-      setVerifying(false);
-      if (otp === VALID_OTP) {
-        setOtpError(false);
-        setStage("verify-phone");
-      } else {
-        setOtpError(true);
+    try {
+      await verifyOtp({ channel: "email", value: newEmail.trim(), otp });
+      setOtpError(false);
+      const res = await sendOtp({ channel: "phone", value: primaryPhone });
+      if (res.devCode) {
+        setDevCode(res.devCode);
+        toast.info(`Demo phone code (no SMS provider yet): ${res.devCode}`);
       }
-    }, 700);
+      setStage("verify-phone");
+    } catch {
+      setOtpError(true);
+    } finally {
+      setVerifying(false);
+    }
   }
 
-  function handlePhoneOtpComplete(otp: string) {
+  async function handlePhoneOtpComplete(otp: string) {
     setVerifying(true);
-    // TODO [INTEGRATION]: POST /api/profile/phone/verify-otp
-    setTimeout(() => {
+    try {
+      await verifyOtp({ channel: "phone", value: primaryPhone, otp });
+      setOtpError(false);
+      setStage("confirm");
+    } catch {
+      setOtpError(true);
+    } finally {
       setVerifying(false);
-      if (otp === VALID_OTP) {
-        setOtpError(false);
-        setStage("confirm");
-      } else {
-        setOtpError(true);
-      }
-    }, 700);
+    }
   }
 
   function handleOtpErrorCleared() {
     setOtpError(false);
   }
 
-  function handleResendOtp() {
-    // TODO [INTEGRATION]: resend for the current stage —
-    //   verify-new-email → POST /api/profile/email/send-otp
-    //   verify-phone      → POST /api/profile/phone/send-otp
-    toast.info("Code resent");
+  async function handleResendOtp() {
+    try {
+      if (stage === "verify-new-email") {
+        await sendOtp({ channel: "email", value: newEmail.trim() });
+      } else if (stage === "verify-phone") {
+        const res = await sendOtp({ channel: "phone", value: primaryPhone });
+        if (res.devCode) {
+          setDevCode(res.devCode);
+          toast.info(`Demo phone code (no SMS provider yet): ${res.devCode}`);
+          return;
+        }
+      }
+      toast.info("Code resent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't resend code");
+    }
   }
 
   function handleBackToEnterEmail() {
@@ -159,13 +180,11 @@ export function ChangeEmailEditor({
 
   function handleConfirm() {
     setSaving(true);
-    // TODO [INTEGRATION]: PATCH /api/profile/email { email: newEmail }
-    //   Server also fires a fire-and-forget security notice to the OLD
-    //   email address confirming this change was made.
-    setTimeout(() => {
-      setSaving(false);
-      onVerified(newEmail.trim());
-    }, 700);
+    // Actual persistence + old-email security notice happens in
+    // updateContact() (called by the parent's onVerified handler) so both
+    // the email-change and phone-change flows share one save path.
+    onVerified(newEmail.trim());
+    setSaving(false);
   }
 
   const trimmedNewEmail = newEmail.trim();
@@ -220,7 +239,6 @@ export function ChangeEmailEditor({
         <div className="px-6 py-5">
           <OtpVerify
             destination={trimmedNewEmail}
-            demoCode={VALID_OTP}
             verifying={verifying}
             error={otpError}
             onErrorCleared={handleOtpErrorCleared}
@@ -239,7 +257,7 @@ export function ChangeEmailEditor({
           </p>
           <OtpVerify
             destination={primaryPhone}
-            demoCode={VALID_OTP}
+            demoCode={devCode ?? undefined}
             verifying={verifying}
             error={otpError}
             onErrorCleared={handleOtpErrorCleared}

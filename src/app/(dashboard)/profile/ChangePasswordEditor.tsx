@@ -12,6 +12,7 @@ import {
   isValidPassword,
   PASSWORD_MIN_LENGTH,
 } from "@/lib/validation";
+import { updatePassword } from "@/app/actions/profile/updatePassword";
 import { ResponsiveEditor } from "./ResponsiveEditor";
 
 interface ChangePasswordValues {
@@ -46,6 +47,7 @@ export function ChangePasswordEditor({
       setCurrentTouched(false);
       setNewTouched(false);
       setConfirmTouched(false);
+      setSaveError("");
     }
   }, [open]);
 
@@ -71,21 +73,31 @@ export function ChangePasswordEditor({
     draft.newPassword !== draft.currentPassword &&
     draft.confirmPassword === draft.newPassword;
 
-  const handleSave = () => {
+  const [saveError, setSaveError] = useState("");
+
+  const handleSave = async () => {
     setCurrentTouched(true);
     setNewTouched(true);
     setConfirmTouched(true);
     if (!canSave) return;
     setSaving(true);
-    // TODO [INTEGRATION]: POST /api/profile/change-password
-    //   body: { currentPassword, newPassword }
-    //   Server must re-verify currentPassword against the stored hash before
-    //   accepting newPassword — never trust client-side validation alone.
-    setTimeout(() => {
-      setSaving(false);
+    setSaveError("");
+    try {
+      const result = await updatePassword({
+        currentPassword: draft.currentPassword,
+        newPassword: draft.newPassword,
+      });
+      if (!result.success) {
+        setSaveError(result.message || "Couldn't update password");
+        return;
+      }
       onOpenChange(false);
       toast.success("Password updated");
-    }, 700);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Couldn't update password");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -153,6 +165,11 @@ export function ChangePasswordEditor({
             </p>
           )}
         </div>
+        {saveError && (
+          <p role="alert" className="text-sm font-medium text-red-600">
+            {saveError}
+          </p>
+        )}
       </div>
     </ResponsiveEditor>
   );

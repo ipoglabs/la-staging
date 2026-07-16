@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/db";
 import Otp from "@/models/Otp";
 import { sendEmail } from "@/lib/email";
+import { normalizeTarget } from "@/lib/otpUtils";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
@@ -21,15 +22,16 @@ interface SendOtpArgs {
 export async function sendOtpService({ channel, value }: SendOtpArgs) {
   await dbConnect();
 
+  const target = normalizeTarget(channel, value);
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
   // One active OTP per (target, channel) — overwrite any previous unexpired
   // one rather than accumulating rows, and reset attempts/lock on resend.
   await Otp.findOneAndUpdate(
-    { target: value, channel },
+    { target, channel },
     {
-      target: value,
+      target,
       channel,
       code,
       expiresAt,
@@ -54,17 +56,24 @@ export async function sendOtpService({ channel, value }: SendOtpArgs) {
     if (!result.success) {
       throw new Error(result.error || "Failed to send verification email");
     }
-  } else {
-    // Phone OTP delivery — this service doesn't send SMS itself. Your
-    // existing /api/sms/send-otp route already handles SMS dispatch
-    // separately; if you want phone OTPs to also flow through this
-    // service/Otp model for consistency, wire an SMS provider call here.
+
+    return { success: true };
+  }
+
+  // ── Phone OTP ──────────────────────────────────────────────────────────
+  // No SMS provider (Twilio/MSG91/etc.) is wired up yet, so this can't
+  // actually text the code to the user. The Otp record above is real and
+  // DB-backed (same as email), so verifyOtpService works correctly end to
+  // end — only the delivery leg is a stand-in. In production this must be
+  // replaced with a real SMS send; until then, surface the code to the
+  // caller so the UI can show it (dev/demo mode only).
+  if (process.env.NODE_ENV === "production") {
     throw new Error(
-      "Phone OTP delivery not implemented in otpService — use /api/sms/send-otp for phone."
+      "SMS delivery isn't configured yet — wire a provider (e.g. Twilio, MSG91) in otpService.ts before enabling phone OTP in production."
     );
   }
 
-  return { success: true };
+  return { success: true, devCode: code };
 }
 
 interface VerifyOtpArgs {
@@ -77,7 +86,8 @@ interface VerifyOtpArgs {
 export async function verifyOtpService({ channel, value, otp }: VerifyOtpArgs) {
   await dbConnect();
 
-  const record = await Otp.findOne({ target: value, channel });
+  const target = normalizeTarget(channel, value);
+  const record = await Otp.findOne({ target, channel });
 
   if (!record) {
     throw new Error("No verification code found — request a new one.");

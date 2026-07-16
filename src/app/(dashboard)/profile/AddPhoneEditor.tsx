@@ -18,9 +18,10 @@
  * either stage discards everything; nothing is saved until verification
  * succeeds.
  *
- * TODO [INTEGRATION]: replace the two setTimeout mocks with real endpoints:
- *   POST /api/profile/phone/send-otp   { phone: fullNumber }
- *   POST /api/profile/phone/verify-otp { phone: fullNumber, otp }
+ * Send/verify goes through the real sendOtp/verifyOtp server actions
+ * (channel: "phone") — DB-backed via the Otp collection, same as email OTP.
+ * No SMS provider is wired up yet (see otpService.ts), so instead of a real
+ * text message the code is shown via toast/on-screen until one is added.
  */
 
 import { useEffect, useState } from "react";
@@ -29,8 +30,9 @@ import { PhoneNumberInput } from "@/components/phone-number-input/PhoneNumberInp
 import { COUNTRIES, type Country } from "@/components/phone-number-input/countries";
 import { OtpInput } from "@/components/ui/otp-input";
 import { useResendTimer } from "@/lib/hooks/useResendTimer";
-import { VALID_OTP } from "@/lib/constants";
 import { isValidPhone, normalizePhoneDigits } from "@/lib/validation";
+import { sendOtp } from "@/app/actions/profile/sendOtp";
+import { verifyOtp } from "@/app/actions/profile/verifyOtp";
 import { cn } from "@/lib/utils";
 import { ResponsiveEditor } from "./ResponsiveEditor";
 
@@ -94,6 +96,8 @@ export function AddPhoneEditor({
   const [phoneError, setPhoneError] = useState("");
   const [otpError, setOtpError] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
   const { seconds, enabled, reset } = useResendTimer(30);
 
   // Fresh state every time the dialog opens
@@ -111,13 +115,14 @@ export function AddPhoneEditor({
       setPhoneError("");
       setOtpError(false);
       setVerifying(false);
+      setDevCode(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const fullNumber = `+${country.dial} ${phone}`;
 
-  function handleSend() {
+  async function handleSend() {
     const digits = phone.trim();
     if (!digits) {
       setPhoneError("Please enter your phone number.");
@@ -142,33 +147,52 @@ export function AddPhoneEditor({
       return;
     }
     setPhoneError("");
-    // TODO [INTEGRATION]: POST /api/profile/phone/send-otp
-    reset();
-    setStage("verify-otp");
+    setSending(true);
+    try {
+      const res = await sendOtp({ channel: "phone", value: fullNumber });
+      if (res.devCode) {
+        setDevCode(res.devCode);
+        toast.info(`Demo code (no SMS provider yet): ${res.devCode}`);
+      }
+      reset();
+      setStage("verify-otp");
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : "Couldn't send verification code");
+    } finally {
+      setSending(false);
+    }
   }
 
-  function handleOtpComplete(otp: string) {
+  async function handleOtpComplete(otp: string) {
     setVerifying(true);
-    // TODO [INTEGRATION]: POST /api/profile/phone/verify-otp
-    setTimeout(() => {
+    try {
+      await verifyOtp({ channel: "phone", value: fullNumber, otp });
+      onVerified(fullNumber);
+    } catch {
+      setOtpError(true);
+    } finally {
       setVerifying(false);
-      if (otp === VALID_OTP) {
-        onVerified(fullNumber);
-      } else {
-        setOtpError(true);
-      }
-    }, 700);
+    }
   }
 
   function handleOtpErrorCleared() {
     setOtpError(false);
   }
 
-  function handleResend() {
+  async function handleResend() {
     if (!enabled) return;
     reset();
-    // TODO [INTEGRATION]: POST /api/profile/phone/send-otp (resend)
-    toast.info("Code resent");
+    try {
+      const res = await sendOtp({ channel: "phone", value: fullNumber });
+      if (res.devCode) {
+        setDevCode(res.devCode);
+        toast.info(`Demo code (no SMS provider yet): ${res.devCode}`);
+        return;
+      }
+      toast.info("Code resent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't resend code");
+    }
   }
 
   return (
@@ -183,7 +207,8 @@ export function AddPhoneEditor({
           : "Verify Your Phone"
       }
       onSave={handleSend}
-      saveLabel="Send code"
+      saveLabel={sending ? "Sending..." : "Send code"}
+      saveDisabled={sending}
       hideSaveButton={stage === "verify-otp"}
     >
       {stage === "enter-phone" ? (
@@ -225,11 +250,11 @@ export function AddPhoneEditor({
             <p className="text-center text-sm text-slate-500">Checking your code&hellip;</p>
           ) : otpError ? (
             <p className="text-center text-sm font-medium text-red-600">That code didn't match — give it another try.</p>
-          ) : (
+          ) : devCode ? (
             <p className="text-center text-sm text-slate-500">
-              Demo OTP: <span className="font-bold tracking-widest text-slate-700">{VALID_OTP}</span>
+              Demo code (no SMS provider yet): <span className="font-bold tracking-widest text-slate-700">{devCode}</span>
             </p>
-          )}
+          ) : null}
           <div className="flex items-center justify-between pt-1">
             <button
               type="button"

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import connectDB from "@/config/database";
 import User from "@/models/user";
 import { verifyToken } from "@/lib/auth";
-import type { ProfileUser } from "@/app/profile/types";
+import type { ProfileUser } from "@/app/(dashboard)/profile/types";
 
 export async function getCurrentUser(): Promise<ProfileUser | null> {
   // JWT-only verify — no DB call for auth check

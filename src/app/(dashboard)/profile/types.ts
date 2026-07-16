@@ -52,3 +52,36 @@ export type ConnectedAccount = {
   lastUsedLabel: string | null;
   isPrimary: boolean;
 };
+
+/**
+ * Shape returned by `getCurrentUser()` (src/app/actions/getCurrentUser.ts) —
+ * the real, DB-backed user record for the signed-in account. This is the
+ * server-fetched source of truth that ProfilePageScreen seeds its local
+ * editor state from (replacing the old hardcoded mock values).
+ */
+export type ProfileUser = {
+  id: string;
+  profileId: string; // maps to User.userId — used as the public @handle
+  username: string;
+  fullName: string;
+  dateOfBirth: string; // ISO yyyy-mm-dd
+  gender: string;
+  nationality: string;
+  residency: string;
+  email: string;
+  primaryNumber: string;
+  secondaryNumber1: string;
+  secondaryNumber2: string;
+  role: string;
+  roleTitle: string;
+  roleDescription: string;
+  image: string;
+  marketingOptIn: boolean;
+  locality: string;
+  address: {
+    country: string;
+    state: string;
+    city: string;
+    postalCode: string;
+  };
+};
