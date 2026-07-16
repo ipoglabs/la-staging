@@ -19,13 +19,13 @@ export async function getFeaturedListings(
     adsId: { $regex: `^${countryCode.toUpperCase()}-` },
   };
 
-  const sort =
+  const sort: Record<string, 1 | -1> =
     section === "recent"
-      ? { createdAt: -1 as const }
+      ? { createdAt: -1 }
       // "Top Picks" placeholder ranking: most recently bumped/boosted listings.
       // TODO: replace with a real quality signal (seller rating, view count,
       // manual editorial flag) once the backend team defines one.
-      : { lastBumpedAt: -1 as const, createdAt: -1 as const };
+      : { lastBumpedAt: -1, createdAt: -1 };
 
   const items = await Post.find(filter)
     .sort(sort)

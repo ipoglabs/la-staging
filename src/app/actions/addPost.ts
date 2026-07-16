@@ -324,8 +324,7 @@ export async function addPost(
       return { ok: false, error: errors.join(" • ") };
     }
 
-    const countryCode = getCountryCode(formData, location);
-    const adsId = await generateAdsId(countryCode);
+    const adsId = await generateAdsId();
 
     const newPost = new Post({
       ...(preGenId ? { _id: preGenId } : {}),

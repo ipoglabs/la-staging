@@ -4,4 +4,5 @@ export type FieldSpec = {
   type: "string" | "number" | "currency" | "date" | "array" | "boolean";
   label: string;
   required?: boolean;
+  unit?: string;
 };
