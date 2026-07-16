@@ -172,8 +172,7 @@ useEffect(() => {
     phone:
       existing?.phone ||
       user.primaryNumber ||
-      user.phone ||
-      user.mobile ||
+      user.secondaryNumber1 ||
       "",
   });
 }, [user, setField]);
