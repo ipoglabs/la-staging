@@ -152,12 +152,10 @@ deleteFeedback: { type: String, trim: true },
 // passwordless accounts created with only one identifier), enforce that at
 // least one of them is always present — an account with neither would be
 // unreachable/unloginable.
-UserSchema.pre("validate", function (this: any, next: any) {
+UserSchema.pre("validate", function (this: any) {
   if (!this.email && !this.primaryNumber) {
-    next(new Error("At least one of email or primaryNumber is required."));
-    return;
+    throw new Error("At least one of email or primaryNumber is required.");
   }
-  next();
 });
 
 export default mongoose.models.User || mongoose.model("User", UserSchema);

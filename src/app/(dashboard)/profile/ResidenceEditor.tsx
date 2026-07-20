@@ -47,13 +47,14 @@ export function ResidenceEditor({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   value: ResidenceValues;
-  onSave: (next: ResidenceValues) => void;
+  onSave: (next: ResidenceValues) => void | Promise<void>;
   primaryLocation?: SavedLocation | null;
 }) {
   const hasExisting = Boolean(value.city);
   const [pickerValue, setPickerValue] = useState<LocationValue | null>(
     hasExisting ? residenceToPickerValue(value) : null,
   );
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) setPickerValue(value.city ? residenceToPickerValue(value) : null);
@@ -68,11 +69,21 @@ export function ResidenceEditor({
     });
   };
 
-  const handleSave = () => {
-    if (!pickerValue) return;
-    // TODO [INTEGRATION]: PATCH /api/users/me { country, state, city }
-    onSave(pickerValueToResidence(pickerValue));
-    onOpenChange(false);
+  const handleSave = async () => {
+    if (!pickerValue || saving) return;
+    setSaving(true);
+    try {
+      // Real persistence happens in the parent's onSave (updateLocation server
+      // action → PATCHes the User doc in Mongo) — we just need to wait for it
+      // and only close the editor once it's actually confirmed.
+      await onSave(pickerValueToResidence(pickerValue));
+      onOpenChange(false);
+    } catch {
+      // Parent's onSave is expected to surface its own error toast; keep the
+      // editor open so the user can retry instead of silently losing the edit.
+    } finally {
+      setSaving(false);
+    }
   };
 
   const current = pickerValue ? pickerValueToResidence(pickerValue) : null;
@@ -84,7 +95,8 @@ export function ResidenceEditor({
       onOpenChange={onOpenChange}
       title="Edit My Residence"
       onSave={handleSave}
-      saveDisabled={!isSet}
+      saveLabel={saving ? "Saving…" : "Save Changes"}
+      saveDisabled={!isSet || saving}
     >
       <div className="space-y-5 px-6 py-5">
         {/* ── State A: location already set — show it, offer to change ── */}

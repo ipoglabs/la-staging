@@ -4,8 +4,9 @@
  * Keeps the Google API key server-side only (never exposed to the browser).
  *
  * SETUP:
- *   1. Add to .env.local:
- *        GOOGLE_PLACES_API_KEY=AIza...
+ *   1. Uses the same key as GOOGLE_MAPS_API_KEY (geo/reverse, geo/forward routes) —
+ *      just make sure Places API is enabled for it in Google Cloud Console,
+ *      alongside Geocoding API.
  *   2. This route accepts: GET /api/places?input=<query>
  *   3. In LocationSearch.tsx uncomment realGoogleSearch() and
  *      replace the mockGoogleSearch() call with it.
@@ -19,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
-const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 // Tighter than the other public routes — each request forwards to a paid
 // external API, so abuse here has a direct cost, not just a load concern.
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   if (!GOOGLE_API_KEY) {
     return NextResponse.json(
-      { error: "GOOGLE_PLACES_API_KEY is not configured in environment variables." },
+      { error: "GOOGLE_MAPS_API_KEY is not configured in environment variables." },
       { status: 500 }
     );
   }
