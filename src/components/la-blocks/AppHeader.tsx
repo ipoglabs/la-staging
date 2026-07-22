@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/types/auth";
 import { useFavouritesStore } from "@/lib/stores/favouritesStore";
 import { useCountryConfig } from "@/lib/hooks/useCountryConfig";
+import { isSimpleLayoutRoute } from "@/lib/layout-routes";
 
 export type AppHeaderVariant = "default" | "simple";
 
@@ -57,11 +58,22 @@ function getInitials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function AppHeader({ variant = "default", user = null }: AppHeaderProps) {
+export default function AppHeader({ variant, user = null }: AppHeaderProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const { config } = useCountryConfig();
   const pathname = usePathname();
   const isLanding = pathname === "/";
+
+  // The root layout no longer passes `variant` — a server-computed prop is
+  // frozen after first paint, so next/link soft nav in or out of /login,
+  // /register, /signup wouldn't otherwise flip it without a hard refresh
+  // (see CLAUDE.md's "Layout signal system" note). Deriving straight from
+  // the live pathname instead makes the header correct itself immediately
+  // on soft navigation, in both directions. `variant` still works as an
+  // explicit override for callers that pass it directly (e.g. the
+  // /snippets/app-shell demo, which needs to force "simple" on a pathname
+  // that isn't actually a simple-layout route).
+  const effectiveVariant = variant ?? (isSimpleLayoutRoute(pathname) ? "simple" : "default");
 
   // ── Auth state ─────────────────────────────────────────────────────────────
   // Seed from the server-rendered `user` prop (getSession() in layout.tsx) so
@@ -156,7 +168,7 @@ export default function AppHeader({ variant = "default", user = null }: AppHeade
         <div className="h-full flex items-center gap-1">
 
           {/* Post CTA */}
-          {variant === "default" && (
+          {effectiveVariant === "default" && (
             <Link
               href={isLoggedIn ? "/post" : "/login?redirect=/post"}
               className={cn(laButtonVariants({ intent: "primary-rose", size: "compact" }), "max-sm:hidden")}
@@ -167,7 +179,7 @@ export default function AppHeader({ variant = "default", user = null }: AppHeade
               POST
             </Link>
           )}
-          {variant === "default" && (
+          {effectiveVariant === "default" && (
             <Link
               href={isLoggedIn ? "/post" : "/login?redirect=/post"}
               className={cn(laButtonVariants({ intent: "primary-rose", size: "compact" }), "w-7 px-0 sm:hidden")}
@@ -179,7 +191,7 @@ export default function AppHeader({ variant = "default", user = null }: AppHeade
           )}
 
           {/* Favourites — always visible; badge driven by favCount when logged in */}
-          {variant === "default" && (
+          {effectiveVariant === "default" && (
             <LaButton
               type="button"
               intent="ghost"

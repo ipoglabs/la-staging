@@ -97,7 +97,6 @@ export default async function RootLayout({
 }>) {
   const reqHeaders = await headers();
   const isBareLayout   = reqHeaders.get("x-bare-layout")   === "1";
-  const isSimpleLayout = reqHeaders.get("x-simple-layout") === "1";
 
   // Bare routes (/unsupported) skip the full app shell entirely.
   // No country detection, no header/footer — just the page content.
@@ -140,12 +139,15 @@ export default async function RootLayout({
             <CountryProvider country={raw}>
 
               <div className="min-h-screen flex flex-col">
-                <AppHeader variant={isSimpleLayout ? "simple" : "default"} user={user} />
+                {/* No variant prop — both self-derive it from the live
+                    pathname (see AppHeader.tsx / AppFooter.tsx), so the
+                    simple/default switch is correct on soft navigation too,
+                    not just on the first server-rendered request. */}
+                <AppHeader user={user} />
                 <main className="flex-1">{children}</main>
                 <AppFooter
                   countryCode={countryCode}
                   countryLabel={countryLabel}
-                  variant={isSimpleLayout ? "simple" : "default"}
                   popularCategories={popularCategories}
                   topLocations={topLocations}
                 />

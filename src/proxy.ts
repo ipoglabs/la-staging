@@ -9,6 +9,7 @@ import {
   isAllowedCountry,
 } from "@/lib/country-context";
 import { COUNTRY_CONFIGS, getConfigByIso, type CountryCode } from "@/config";
+import { isSimpleLayoutRoute } from "@/lib/layout-routes";
 
 /* ─── Country-prefixed URLs (/in/, /gb/, /sg/) ──────────────────────────────
  * [ARCHITECTURE — 2026-07-11] The URL segment is the source of truth for
@@ -113,14 +114,6 @@ const BARE_LAYOUT_ROUTES = ["/unsupported", "/design-system", "/snippets", "/la-
 
 function isBareLayoutRoute(pathname: string): boolean {
   return BARE_LAYOUT_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
-}
-
-// Routes that use the simple header/footer variant (no POST CTA, no favourites).
-// Auth/onboarding journeys where the full product shell would be distracting.
-const SIMPLE_LAYOUT_ROUTES = ["/login", "/register", "/signup"];
-
-function isSimpleLayoutRoute(pathname: string): boolean {
-  return SIMPLE_LAYOUT_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 }
 
 export function proxy(request: NextRequest) {
