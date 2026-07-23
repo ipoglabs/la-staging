@@ -6,9 +6,10 @@
  * Variants:
  *   "default" — full header: Logo + POST CTA + Favourites sheet + Avatar menu
  *   "simple"  — minimal header: Logo + Avatar menu only
+ *   "hidden"  — renders nothing (auth journeys: /login, /register, /signup)
  *
  * Props:
- *   variant  — layout variant (default | simple)
+ *   variant  — layout variant (default | simple | hidden)
  *   user     — authenticated user from server session, or null/undefined when logged out
  *
  * Favourites are stored in localStorage (useFavouritesStore) — available to all users,
@@ -43,7 +44,7 @@ import { useFavouritesStore } from "@/lib/stores/favouritesStore";
 import { useCountryConfig } from "@/lib/hooks/useCountryConfig";
 import { isSimpleLayoutRoute } from "@/lib/layout-routes";
 
-export type AppHeaderVariant = "default" | "simple";
+export type AppHeaderVariant = "default" | "simple" | "hidden";
 
 interface AppHeaderProps {
   variant?: AppHeaderVariant;
@@ -73,7 +74,11 @@ export default function AppHeader({ variant, user = null }: AppHeaderProps) {
   // explicit override for callers that pass it directly (e.g. the
   // /snippets/app-shell demo, which needs to force "simple" on a pathname
   // that isn't actually a simple-layout route).
-  const effectiveVariant = variant ?? (isSimpleLayoutRoute(pathname) ? "simple" : "default");
+  //
+  // Auth journeys (/login, /register, /signup) drop the header entirely
+  // rather than falling back to "simple" — there's no logo bar on these
+  // pages at all.
+  const effectiveVariant = variant ?? (isSimpleLayoutRoute(pathname) ? "hidden" : "default");
 
   // ── Auth state ─────────────────────────────────────────────────────────────
   // Seed from the server-rendered `user` prop (getSession() in layout.tsx) so
@@ -130,6 +135,8 @@ export default function AppHeader({ variant, user = null }: AppHeaderProps) {
   useEffect(() => {
     useFavouritesStore.persist.rehydrate();
   }, []);
+
+  if (effectiveVariant === "hidden") return null;
 
   return (
     <header className="bg-white border-b border-stone-300 z-10 shadow-gray-300">

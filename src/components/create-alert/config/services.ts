@@ -109,6 +109,39 @@ export const services: MainCategory = {
       ],
     },
     {
+      id: "tutoring",
+      label: "Tutoring",
+      icon: "book-open",
+      filters: [
+        {
+          id: "subject",
+          label: "Subject",
+          type: "toggle",
+          options: [
+            { label: "Maths",     value: "maths"     },
+            { label: "Science",   value: "science"   },
+            { label: "English",   value: "english"   },
+            { label: "Languages", value: "languages" },
+            { label: "Music",     value: "music"     },
+            { label: "Coding",    value: "coding"     },
+            { label: "Other",     value: "other"     },
+          ],
+        },
+        {
+          id: "level",
+          label: "Level",
+          type: "toggle",
+          options: [
+            { label: "Primary",   value: "primary"   },
+            { label: "Secondary", value: "secondary" },
+            { label: "College",   value: "college"   },
+            { label: "Adult",     value: "adult"      },
+          ],
+        },
+        serviceMode,
+      ],
+    },
+    {
       id: "education_learning",
       label: "Education & Learning",
       icon: "graduation-cap",
@@ -139,6 +172,34 @@ export const services: MainCategory = {
           ],
         },
         serviceMode,
+      ],
+    },
+    {
+      id: "travel_tourism",
+      label: "Travel & Tourism",
+      icon: "plane",
+      filters: [
+        {
+          id: "service_type",
+          label: "Service",
+          type: "toggle",
+          options: [
+            { label: "Tour Guide",       value: "tour_guide"   },
+            { label: "Travel Agent",     value: "travel_agent" },
+            { label: "Visa Assistance",  value: "visa"         },
+            { label: "Airport Transfer", value: "transfer"     },
+            { label: "Trip Planning",    value: "planning"     },
+          ],
+        },
+        {
+          id: "destination_type",
+          label: "Destination",
+          type: "toggle",
+          options: [
+            { label: "Domestic",      value: "domestic"      },
+            { label: "International", value: "international" },
+          ],
+        },
       ],
     },
     {

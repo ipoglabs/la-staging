@@ -1,5 +1,5 @@
 import type { MainCategory } from "../types";
-import { field, workArrangement, conditionFull } from "./shared";
+import { field, workArrangement, conditionFull, experience } from "./shared";
 
 export const business: MainCategory = {
   id: "business",
@@ -112,6 +112,12 @@ export const business: MainCategory = {
           ],
         },
       ],
+    },
+    {
+      id: "freelance_contractors",
+      label: "Freelance Contractors",
+      icon: "user-check",
+      filters: [field, experience, workArrangement],
     },
     {
       id: "partnership",

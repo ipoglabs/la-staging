@@ -1,6 +1,7 @@
 import type { IPost } from "@/models/post";
 import type { FeaturedListingItem } from "@/components/la-blocks/FeaturedListings";
 import type { ListingStatus } from "@/components/la-blocks/la-thumbnail-listing/LaThumbnailListingCard";
+import { COUNTRY_CONFIGS, type CountryCode } from "@/config";
 
 export type LeanPost = IPost & { _id: unknown };
 
@@ -21,18 +22,26 @@ export function mapStatus(status?: IPost["status"]): ListingStatus {
 }
 
 // TODO [REVIEW]: this fallback chain guesses which price field applies per
-// category, with no real currency formatting (just a raw "$" prefix).
-// Revisit once a proper per-country currency formatter exists.
+// category — no per-category currency conversion, just the post's own
+// market's symbol. Revisit once a proper per-country currency formatter
+// exists.
+function currencySymbolFor(post: LeanPost): string {
+  const code = post.country as CountryCode | undefined;
+  return (code && COUNTRY_CONFIGS[code]?.currencySymbol) || "$";
+}
+
 export function resolvePrice(post: LeanPost): { priceLabel: string; priceSuffix?: string } {
-  if (post.rentPrice != null) return { priceLabel: `$${post.rentPrice}`, priceSuffix: "/ mo" };
-  if (post.salePrice != null) return { priceLabel: `$${post.salePrice}` };
-  if (post.rent != null) return { priceLabel: `$${post.rent}`, priceSuffix: "/ mo" };
-  if (post.rateNightly != null) return { priceLabel: `$${post.rateNightly}`, priceSuffix: "/ night" };
-  if (post.rateMonthly != null) return { priceLabel: `$${post.rateMonthly}`, priceSuffix: "/ mo" };
-  if (post.salary != null) return { priceLabel: `$${post.salary}` };
-  if (post.hourlyRate != null) return { priceLabel: `$${post.hourlyRate}`, priceSuffix: "/ hr" };
-  if (post.price != null) return { priceLabel: `$${post.price}` };
-  if (post.budget != null) return { priceLabel: `$${post.budget}` };
+  const symbol = currencySymbolFor(post);
+  const fmt = (n: number) => `${symbol}${n.toLocaleString()}`;
+  if (post.rentPrice != null) return { priceLabel: fmt(post.rentPrice), priceSuffix: "/ mo" };
+  if (post.salePrice != null) return { priceLabel: fmt(post.salePrice) };
+  if (post.rent != null) return { priceLabel: fmt(post.rent), priceSuffix: "/ mo" };
+  if (post.rateNightly != null) return { priceLabel: fmt(post.rateNightly), priceSuffix: "/ night" };
+  if (post.rateMonthly != null) return { priceLabel: fmt(post.rateMonthly), priceSuffix: "/ mo" };
+  if (post.salary != null) return { priceLabel: fmt(post.salary) };
+  if (post.hourlyRate != null) return { priceLabel: fmt(post.hourlyRate), priceSuffix: "/ hr" };
+  if (post.price != null) return { priceLabel: fmt(post.price) };
+  if (post.budget != null) return { priceLabel: fmt(post.budget) };
   return { priceLabel: "Price on request" };
 }
 

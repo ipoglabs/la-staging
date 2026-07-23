@@ -10,6 +10,49 @@ export const specialOffers: MainCategory = {
   iconColor: "text-rose-600",
   subcategories: [
     {
+      id: "banking_finance",
+      label: "Banking & Finance",
+      icon: "landmark",
+      filters: [
+        {
+          id: "bf_category",
+          label: "Category",
+          type: "toggle",
+          options: [
+            { label: "Credit Card", value: "credit_card" },
+            { label: "Loan",        value: "loan"        },
+            { label: "Insurance",   value: "insurance"   },
+            { label: "Savings",     value: "savings"     },
+            { label: "Investment",  value: "investment"  },
+            { label: "Other",       value: "other"       },
+          ],
+        },
+        dealType,
+        discount,
+      ],
+    },
+    {
+      id: "travel_tourism",
+      label: "Travel & Tourism",
+      icon: "plane",
+      filters: [
+        {
+          id: "travel_category",
+          label: "Category",
+          type: "toggle",
+          options: [
+            { label: "Flights",    value: "flights"    },
+            { label: "Hotels",     value: "hotels"     },
+            { label: "Packages",   value: "packages"   },
+            { label: "Activities", value: "activities" },
+            { label: "Car Rental", value: "car_rental" },
+          ],
+        },
+        dealType,
+        discount,
+      ],
+    },
+    {
       id: "retail_shopping",
       label: "Retail & Shopping",
       icon: "shopping-bag",

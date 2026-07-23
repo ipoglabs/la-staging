@@ -2,14 +2,15 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { History } from "lucide-react";
 import WhyLokalads from "@/components/la-blocks/WhyLokalads";
 import CategoryGrid from "@/components/la-blocks/CategoryGrid";
 import { CreateAlertBanner, CreateAlertDialog } from "@/components/create-alert";
 import { CATEGORIES } from "@/config/categories";
 import FeaturedListings, { type FeaturedListingItem } from "@/components/la-blocks/FeaturedListings";
-import RecentSearches from "@/components/la-blocks/RecentSearches";
+import RecentSearches, { type RecentSearchItem } from "@/components/la-blocks/RecentSearches";
 import { getFeaturedListings } from "@/app/actions/getFeaturedListings";
-import { RECENT_SEARCHES } from "@/lib/mock/mock-searches";
+import { getPopularSearches } from "@/app/actions/getPopularSearches";
 import { useCountryConfig } from "@/lib/hooks/useCountryConfig";
 import { LaSearchBar, type SearchQuery } from "@/components/la-search-bar";
 import { LocationPicker, type LocationValue } from "@/components/location-picker";
@@ -36,6 +37,7 @@ export default function LandingPage() {
   // falling back to fake mock inventory; see the section guards below.
   const [recentPosts, setRecentPosts] = React.useState<FeaturedListingItem[]>([]);
   const [topPicks, setTopPicks] = React.useState<FeaturedListingItem[]>([]);
+  const [popularSearches, setPopularSearches] = React.useState<RecentSearchItem[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -45,6 +47,16 @@ export default function LandingPage() {
     getFeaturedListings(countryCode, "top-picks", 10)
       .then((items) => { if (!cancelled) setTopPicks(items); })
       .catch(() => { if (!cancelled) setTopPicks([]); });
+    // "Popular Searches" — derived from real post volume (no search-query
+    // logging exists yet), see getPopularSearches.ts. Icon is attached here
+    // rather than returned from the server action since RecentSearchItem's
+    // icon is a React node, not a value a server action can serialize.
+    getPopularSearches(countryCode, 9)
+      .then((items) => {
+        if (cancelled) return;
+        setPopularSearches(items.map((item) => ({ ...item, icon: <History className="h-3.5 w-3.5" /> })));
+      })
+      .catch(() => { if (!cancelled) setPopularSearches([]); });
     return () => { cancelled = true; };
   }, [countryCode]);
 
@@ -130,11 +142,10 @@ export default function LandingPage() {
         </div>
         
 
-        {/* Section: Recent Searches */}
-        {/* TODO: replace RECENT_SEARCHES with an API-driven "popular/trending" endpoint per country. */}
+        {/* Section: Popular Searches — real post volume, see getPopularSearches.ts */}
         <RecentSearches
           title="Popular Searches"
-          items={RECENT_SEARCHES}
+          items={popularSearches}
           seeAllHref={`/${countryCode}/listings?view=popular-searches`}
           className="bg-amber-100"
         />

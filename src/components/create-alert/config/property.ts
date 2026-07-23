@@ -197,6 +197,60 @@ export const property: MainCategory = {
       ],
     },
     {
+      id: "holiday_rental",
+      label: "Holiday Rental",
+      icon: "palm-tree",
+      filters: [
+        {
+          id: "prop_type",
+          label: "Property Type",
+          type: "toggle",
+          options: [
+            { label: "Apartment",          value: "apartment" },
+            { label: "House / Villa",      value: "house"     },
+            { label: "Cottage",            value: "cottage"   },
+            { label: "Cabin",              value: "cabin"     },
+            { label: "Serviced Apartment", value: "serviced"  },
+          ],
+        },
+        {
+          id: "guests",
+          label: "Guests",
+          type: "toggle",
+          singleSelect: true,
+          options: [
+            { label: "Any", value: "any"  },
+            { label: "1-2", value: "1to2" },
+            { label: "3-4", value: "3to4" },
+            { label: "5-8", value: "5to8" },
+            { label: "8+",  value: "8up"  },
+          ],
+        },
+        {
+          id: "stay_length",
+          label: "Stay Length",
+          type: "toggle",
+          singleSelect: true,
+          options: [
+            { label: "Any",     value: "any"     },
+            { label: "Weekend", value: "weekend" },
+            { label: "Weekly",  value: "weekly"  },
+            { label: "Monthly", value: "monthly" },
+          ],
+        },
+        {
+          id: "listed_by",
+          label: "Listed by",
+          type: "toggle",
+          options: [
+            { label: "Owner",             value: "owner"   },
+            { label: "Agent",              value: "agent"   },
+            { label: "Property Manager",   value: "manager" },
+          ],
+        },
+      ],
+    },
+    {
       id: "new_projects",
       label: "New Projects / Off-Plan",
       icon: "building",

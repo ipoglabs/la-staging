@@ -23,6 +23,12 @@ export const CATEGORIES = [
   "electronics-tech",
   "home-furniture",
   "fashion-clothing",
+  // Added when the full lib/mock/ dataset (21 categories) was migrated into
+  // Mongo — these 4 exist in mock data but hadn't been added here yet.
+  "musical-instruments",
+  "books-media-collectibles",
+  "tickets-vouchers",
+  "free-giveaway",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
@@ -47,6 +53,10 @@ export const ADV_ID_RANGES: Record<Category, [number, number]> = {
   "electronics-tech": [79001, 79999],
   "home-furniture": [80001, 80999],
   "fashion-clothing": [81001, 81999],
+  "musical-instruments": [82001, 82999],
+  "books-media-collectibles": [83001, 83999],
+  "tickets-vouchers": [84001, 84999],
+  "free-giveaway": [85001, 85999],
 };
 
 export const ID_PREFIXES: Record<Category, string> = {
@@ -68,6 +78,10 @@ export const ID_PREFIXES: Record<Category, string> = {
   "electronics-tech": "tech",
   "home-furniture": "home",
   "fashion-clothing": "fashion",
+  "musical-instruments": "music",
+  "books-media-collectibles": "media",
+  "tickets-vouchers": "ticket",
+  "free-giveaway": "free",
 };
 
 export const STATUS_VALUES = [

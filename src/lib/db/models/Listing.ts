@@ -4,12 +4,10 @@ import {
   CATEGORIES,
   STATUS_VALUES,
   LISTING_TYPE_VALUES,
-  PRICE_SUFFIXES,
   Country,
   Category,
   ListingStatus,
   ListingType,
-  PriceSuffix,
 } from "./constants";
 
 /**
@@ -66,7 +64,11 @@ export interface IListing extends Document {
   id: string; // human-readable slug, e.g. "prop-rent-01" style but real-data safe
   images: { src: string; alt: string }[];
   priceLabel: string;
-  priceSuffix?: PriceSuffix;
+  // Free-form — mock data alone produces 70+ distinct suffix strings
+  // ("/ session", "(was £80)", "for 24 months", …), so this is display text,
+  // not a controlled vocabulary. See constants.ts PRICE_SUFFIXES for the
+  // handful of common ones the post-ad form may still offer as presets.
+  priceSuffix?: string;
   title: string;
   detailsLabel: string;
   locationLabel: string;
@@ -97,7 +99,7 @@ const ListingSchema = new Schema<IListing>(
       validate: (v: unknown[]) => Array.isArray(v) && v.length >= 1,
     },
     priceLabel: { type: String, required: true },
-    priceSuffix: { type: String, enum: PRICE_SUFFIXES },
+    priceSuffix: { type: String },
     title: { type: String, required: true, maxlength: 80 },
     detailsLabel: { type: String, required: true },
     locationLabel: { type: String, required: true },

@@ -1,4 +1,5 @@
 import type { MainCategory } from "../types";
+import { conditionFull } from "./shared";
 
 export const education: MainCategory = {
   id: "education",
@@ -56,6 +57,26 @@ export const education: MainCategory = {
             { label: "Other",     value: "other"     },
           ],
         },
+      ],
+    },
+    {
+      id: "study_materials",
+      label: "Study Materials",
+      icon: "book",
+      filters: [
+        {
+          id: "material_type",
+          label: "Type",
+          type: "toggle",
+          options: [
+            { label: "Textbooks",   value: "textbooks"   },
+            { label: "Notes",       value: "notes"       },
+            { label: "Past Papers", value: "past_papers" },
+            { label: "Guides",      value: "guides"      },
+            { label: "Other",       value: "other"       },
+          ],
+        },
+        conditionFull,
       ],
     },
     {

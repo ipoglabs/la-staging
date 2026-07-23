@@ -9,9 +9,9 @@ export const foodDining: MainCategory = {
   iconColor: "text-lime-600",
   subcategories: [
     {
-      id: "home_chefs_tiffin",
-      label: "Home Chefs & Tiffin",
-      icon: "chef-hat",
+      id: "home_cooked",
+      label: "Home Cooked Meals",
+      icon: "cooking-pot",
       filters: [
         {
           id: "cuisine",
@@ -36,18 +36,6 @@ export const foodDining: MainCategory = {
             { label: "Halal",    value: "halal"    },
           ],
         },
-        {
-          id: "plan",
-          label: "Plan",
-          type: "toggle",
-          singleSelect: true,
-          options: [
-            { label: "One-off",  value: "oneoff"  },
-            { label: "Daily",   value: "daily"   },
-            { label: "Weekly",  value: "weekly"  },
-            { label: "Monthly", value: "monthly" },
-          ],
-        },
       ],
     },
     {
@@ -64,6 +52,36 @@ export const foodDining: MainCategory = {
             { label: "Corporate",  value: "corporate"  },
             { label: "Birthday",   value: "birthday"   },
             { label: "Other",      value: "other"      },
+          ],
+        },
+      ],
+    },
+    {
+      id: "tiffin_services",
+      label: "Tiffin Services",
+      icon: "package",
+      filters: [
+        {
+          id: "dietary",
+          label: "Dietary",
+          type: "toggle",
+          options: [
+            { label: "Veg",     value: "veg"    },
+            { label: "Vegan",   value: "vegan"  },
+            { label: "Non-Veg", value: "nonveg" },
+            { label: "Jain",    value: "jain"   },
+          ],
+        },
+        {
+          id: "plan",
+          label: "Plan",
+          type: "toggle",
+          singleSelect: true,
+          options: [
+            { label: "One-off",  value: "oneoff"  },
+            { label: "Daily",    value: "daily"   },
+            { label: "Weekly",   value: "weekly"  },
+            { label: "Monthly",  value: "monthly" },
           ],
         },
       ],
